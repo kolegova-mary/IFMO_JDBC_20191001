@@ -14,25 +14,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
-
-import java.util.Comparator;
 import java.util.List;
 
 public class ServiceFactory {
-
-    List<Department> departments = getAllDepartments();
-
-    private List<Department> getAllDepartments() {
-        ConnectionSource connectionSource = ConnectionSource.instance();
-        try {
-            Connection connection = connectionSource.createConnection();
-            Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM DEPARTMENT");
-            return mapSetDepartments(resultSet);
-        } catch (SQLException e) {
-            return null;
-        }
-    }
 
     private List<Department> mapSetDepartments(ResultSet resultSet) {
         List<Department> departments = new ArrayList<>();
@@ -51,19 +35,8 @@ public class ServiceFactory {
         return departments;
     }
 
-    private List<Employee> getAllEmployees() {
-        ConnectionSource connectionSource = ConnectionSource.instance();
-        try {
-            Connection connection = connectionSource.createConnection();
-            Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM EMPLOYEE");
-            return mapSet(resultSet);
-        } catch (SQLException e) {
-            return null;
-        }
-    }
 
-    public Employee employeeRowMapper(ResultSet resultSet, boolean isFir) {
+    private Employee employeeRowMapper(ResultSet resultSet, boolean isFir) {
         try {
             Employee manager = null;
             Department department = null;
@@ -92,8 +65,9 @@ public class ServiceFactory {
         }
     }
 
-    private Employee getMan(ResultSet resultSet, Integer id) {
+    private Employee getMan(ResultSet res, Integer id) {
         try {
+            ResultSet resultSet = getResultSet("select * from employee");
             Employee man = null;
             int row = resultSet.getRow();
             resultSet.beforeFirst();
@@ -111,14 +85,6 @@ public class ServiceFactory {
         return null;
     }
 
-    private Department getDepartment(String department) {
-        for (Department d : departments) {
-            if (d.getId().toString().equals(department)) {
-                return d;
-            }
-        }
-        return null;
-    }
 
     private List<Employee> mapSet(ResultSet resultSet) {
         List<Employee> employees = new ArrayList<>();
@@ -131,158 +97,143 @@ public class ServiceFactory {
         return employees;
     }
 
-    List<Employee> getRightPage(Paging paging, List<Employee> employees) {
-        int a = employees.size();
-        if ((paging.page) * paging.itemPerPage < a) {
-            a = (paging.page) * paging.itemPerPage;
-        }
-        return employees.subList(paging.itemPerPage * (paging.page - 1), a);
+    private ResultSet getResultSet(String SQL) throws SQLException {
+        ConnectionSource connectionSource = ConnectionSource.instance();
+        Connection connection = connectionSource.createConnection();
+        Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
+        return statement.executeQuery(SQL);
     }
-
 
     public EmployeeService employeeService() {
         return new EmployeeService() {
             @Override
             public List<Employee> getAllSortByHireDate(Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getHired().compareTo(o2.getHired());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee order by hiredate"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getAllSortByLastname(Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getFullName().getLastName().compareTo(o2.getFullName().getLastName());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee order by lastname"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getAllSortBySalary(Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getSalary().compareTo(o2.getSalary());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee order by salary"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getAllSortByDepartmentNameAndLastname(Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        if (o1.getDepartment() == null){
-                            return -1;
-                        }
-                        if (o2.getDepartment() == null){
-                            return 1;
-                        }
-                        if (o1.getDepartment().getName().equals(o2.getDepartment().getName())) {
-                            return o1.getFullName().getLastName().compareTo(o2.getFullName().getLastName());
-                        } else {
-                            return o1.getDepartment().getName().compareTo(o2.getDepartment().getName());
-                        }
-
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee order by department,lastname"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByDepartmentSortByHireDate(Department department, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getDepartment() == null);
-                ans.removeIf(employee -> !employee.getDepartment().getId().equals(department.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getHired().compareTo(o2.getHired());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where department = " + department.getId() +" order by hiredate"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByDepartmentSortBySalary(Department department, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getDepartment() == null);
-                ans.removeIf(employee -> !employee.getDepartment().getId().equals(department.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getSalary().compareTo(o2.getSalary());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where department = " + department.getId() +" order by salary"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByDepartmentSortByLastname(Department department, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getDepartment() == null);
-                ans.removeIf(employee -> !employee.getDepartment().getId().equals(department.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getFullName().getLastName().compareTo(o2.getFullName().getLastName());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where department = " + department.getId() +" order by lastname"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByManagerSortByLastname(Employee manager, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getManager() == null);
-                ans.removeIf(employee -> !employee.getManager().getId().equals(manager.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getFullName().getLastName().compareTo(o2.getFullName().getLastName());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where manager = " + manager.getId() +" order by lastname"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByManagerSortByHireDate(Employee manager, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getManager() == null);
-                ans.removeIf(employee -> !employee.getManager().getId().equals(manager.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getHired().compareTo(o2.getHired());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where manager = " + manager.getId() +" order by hiredate"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public List<Employee> getByManagerSortBySalary(Employee manager, Paging paging) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getManager() == null);
-                ans.removeIf(employee -> !employee.getManager().getId().equals(manager.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o1.getSalary().compareTo(o2.getSalary());
-                    }
-                });
-                return getRightPage(paging, ans);
+                String sql = "select * from employee where manager = " + manager.getId() +" order by salary"+
+                        " limit " + paging.itemPerPage +
+                        " offset " + paging.itemPerPage * (paging.page - 1);
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
@@ -318,21 +269,18 @@ public class ServiceFactory {
 
             @Override
             public Employee getTopNthBySalaryByDepartment(int salaryRank, Department department) {
-                List<Employee> ans = getAllEmployees();
-                ans.removeIf(employee -> employee.getDepartment() == null);
-                ans.removeIf(employee -> !employee.getDepartment().getId().equals(department.getId()));
-                ans.sort(new Comparator<Employee>() {
-                    @Override
-                    public int compare(Employee o1, Employee o2) {
-                        return o2.getSalary().compareTo(o1.getSalary());
-                    }
-                });
-                return ans.get(salaryRank-1);
+                String sql = "select * from employee where department = " + department.getId() +" order by salary desc";
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet).get(salaryRank-1);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
         };
     }
 
-    public Employee employeeRowMapperChain(ResultSet resultSet) {
+    private Employee employeeRowMapperChain(ResultSet resultSet) {
         try {
             Employee manager = null;
             Department department = null;
@@ -356,6 +304,16 @@ public class ServiceFactory {
                     department
             );
         } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private Department getDepartment(String department) {
+        try {
+            ResultSet res = getResultSet("select * from department where id = " + department);
+            return mapSetDepartments(res).get(0);
+        } catch (SQLException e) {
+            e.printStackTrace();
             return null;
         }
     }
