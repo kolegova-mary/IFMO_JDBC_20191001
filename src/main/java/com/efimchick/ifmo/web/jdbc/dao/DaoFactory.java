@@ -17,22 +17,9 @@ import java.util.*;
 
 public class DaoFactory {
 
-    List<Employee> employees = getAllEmployees();
-    List<Department> departments = getAllDepartments();
 
-    private List<Department> getAllDepartments() {
-        ConnectionSource connectionSource = ConnectionSource.instance();
-        try {
-            Connection connection = connectionSource.createConnection();
-            Statement statement = connection.createStatement();
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM DEPARTMENT");
-            return mapSetDepartments(resultSet);
-        } catch (SQLException e) {
-            return null;
-        }
-    }
-
-    private List<Department> mapSetDepartments(ResultSet resultSet) {
+    private List<Department> mapSetDepartments(ResultSet resultSet) throws SQLException {
+        resultSet.beforeFirst();
         List<Department> departments = new ArrayList<>();
         try {
             while (resultSet.next()) {
@@ -49,19 +36,21 @@ public class DaoFactory {
         return departments;
     }
 
-    private static List<Employee> getAllEmployees() {
+    private ResultSet getResultSet(String SQL) throws SQLException {
         ConnectionSource connectionSource = ConnectionSource.instance();
-        try {
-            Connection connection = connectionSource.createConnection();
-            Statement statement = connection.createStatement();
-            ResultSet resultSet = statement.executeQuery("SELECT * FROM EMPLOYEE");
-            return mapSet(resultSet);
-        } catch (SQLException e) {
-            return null;
-        }
+        Connection connection = connectionSource.createConnection();
+        Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
+        return statement.executeQuery(SQL);
     }
 
-    public static Employee employeeRowMapper(ResultSet resultSet) {
+    private void insertAndDelete(String SQL) throws SQLException {
+        ConnectionSource connectionSource = ConnectionSource.instance();
+        Connection connection = connectionSource.createConnection();
+        Statement statement = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
+        statement.executeUpdate(SQL);
+    }
+
+    private Employee employeeRowMapper(ResultSet resultSet) {
         try {
             BigInteger managerId = BigInteger.ZERO;
             BigInteger departmentId = BigInteger.ZERO;
@@ -87,7 +76,8 @@ public class DaoFactory {
         }
     }
 
-    public static List<Employee> mapSet(ResultSet resultSet) {
+    private List<Employee> mapSet(ResultSet resultSet) throws SQLException {
+        resultSet.beforeFirst();
         List<Employee> employees = new ArrayList<>();
         try {
             while (resultSet.next()) {
@@ -103,50 +93,81 @@ public class DaoFactory {
         return new EmployeeDao() {
             @Override
             public List<Employee> getByDepartment(Department department) {
-                List<Employee> result = new ArrayList<>();
-                for (Employee e : employees) {
-                    if (e.getDepartmentId().equals(department.getId())) {
-                        result.add(e);
-                    }
+                String sql = "select * from employee where department = " + department.getId();
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
                 }
-                return result;
             }
 
             @Override
             public List<Employee> getByManager(Employee employee) {
-                List<Employee> result = new ArrayList<>();
-                for (Employee e : employees) {
-                    if (e.getManagerId().equals(employee.getId())) {
-                        result.add(e);
-                    }
+                String sql = "select * from employee where manager = " + employee.getId();
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
                 }
-                return result;
             }
 
             @Override
             public Optional<Employee> getById(BigInteger Id) {
-                for (Employee e : employees) {
-                    if (e.getId().equals(Id)) {
-                        return Optional.of(e);
+                String sql = "select * from employee where id = " + Id;
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    if (resultSet.next() == false) {
+                        return Optional.empty();
+                    } else {
+                        List<Employee> employees = mapSet(resultSet);
+                        return Optional.of(employees.get(0));
                     }
+                } catch (SQLException e) {
+                    return Optional.empty();
                 }
-                return Optional.empty();
             }
 
             @Override
             public List<Employee> getAll() {
-                return employees;
+                String sql = "select * from employee";
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    return mapSet(resultSet);
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public Employee save(Employee employee) {
-                employees.add(employee);
+                String sql = "insert into employee values('"
+                        + employee.getId() + "', '"
+                        + employee.getFullName().getFirstName() + "', '"
+                        + employee.getFullName().getLastName() + "', '"
+                        + employee.getFullName().getMiddleName() + "', '"
+                        + employee.getPosition() + "', '"
+                        + employee.getManagerId() + "', '"
+                        + employee.getHired() + "', '"
+                        + employee.getSalary() + "', '"
+                        + employee.getDepartmentId() + "')";
+                try {
+                    insertAndDelete(sql);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
                 return employee;
             }
 
             @Override
             public void delete(Employee employee) {
-                employees.remove(employee);
+                String sql = "delete from employee where id = " + employee.getId();
+                try {
+                    insertAndDelete(sql);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
             }
         };
     }
@@ -155,29 +176,63 @@ public class DaoFactory {
         return new DepartmentDao() {
             @Override
             public Optional<Department> getById(BigInteger Id) {
-                for (Department d : departments) {
-                    if (d.getId().equals(Id)) {
-                        return Optional.of(d);
+                String sql = "select * from department where id = " + Id;
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    if (resultSet.next() == false) {
+                        return Optional.empty();
+                    } else {
+                        List<Department> departments = mapSetDepartments(resultSet);
+                        return Optional.of(departments.get(0));
                     }
+                } catch (SQLException e) {
+                    return Optional.empty();
                 }
-                return Optional.empty();
             }
 
             @Override
             public List<Department> getAll() {
-                return departments;
+                String sql = "select * from department";
+                try {
+                    ResultSet resultSet = getResultSet(sql);
+                    List<Department> departments = mapSetDepartments(resultSet);
+                    return departments;
+                } catch (SQLException e) {
+                    return null;
+                }
             }
 
             @Override
             public Department save(Department department) {
-                departments.removeIf(d -> d.getId().equals(department.getId()));
-                departments.add(department);
+                String sql;
+                Optional<Department> optionalDepartment = getById(department.getId());
+                if (optionalDepartment.isPresent()) {
+                    sql = "update department set name = '"
+                            + department.getName() + "',"
+                            + " location = '" + department.getLocation()
+                            + "' where id = '" + department.getId() + "'";
+                } else {
+                    sql = "insert into department values('"
+                            + department.getId() + "', '"
+                            + department.getName() + "', '"
+                            + department.getLocation() + "')";
+                }
+                try {
+                    insertAndDelete(sql);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
                 return department;
             }
 
             @Override
             public void delete(Department department) {
-                departments.remove(department);
+                String sql = "delete from department where id = " + department.getId();
+                try {
+                    insertAndDelete(sql);
+                }catch (SQLException e) {
+                    e.printStackTrace();
+                }
             }
         };
     }
